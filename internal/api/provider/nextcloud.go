@@ -11,14 +11,13 @@ import (
 
 // Gitlab
 
-const defaultGitLabAuthBase = "gitlab.com"
-
-type gitlabProvider struct {
+type nextcloudProvider struct {
 	*oauth2.Config
 	Host string
 }
 
-type gitlabUser struct {
+
+type nextcloudUser struct {
 	Email       string `json:"email"`
 	Name        string `json:"name"`
 	AvatarURL   string `json:"avatar_url"`
@@ -26,27 +25,21 @@ type gitlabUser struct {
 	ID          int    `json:"id"`
 }
 
-type gitlabUserEmail struct {
+type nextcloudUserEmail struct {
 	ID    int    `json:"id"`
 	Email string `json:"email"`
 }
 
-// NewGitlabProvider creates a Gitlab account provider.
-func NewGitlabProvider(ext conf.OAuthProviderConfiguration, scopes string) (OAuthProvider, error) {
+// NewNextcloudProvider creates a Nextcloud account provider.
+func NewNextcloudProvider(ext conf.OAuthProviderConfiguration, scopes string) (OAuthProvider, error) {
 	if err := ext.ValidateOAuth(); err != nil {
 		return nil, err
 	}
 
-	oauthScopes := []string{
-		"read_user",
-	}
+	oauthScopes := []string{}
 
-	if scopes != "" {
-		oauthScopes = append(oauthScopes, strings.Split(scopes, ",")...)
-	}
-
-	host := chooseHost(ext.URL, defaultGitLabAuthBase)
-	return &gitlabProvider{
+	host := chooseHost(ext.URL, "")
+	return &nextcloudProvider{
 		Config: &oauth2.Config{
 			ClientID:     ext.ClientID[0],
 			ClientSecret: ext.Secret,
@@ -61,12 +54,12 @@ func NewGitlabProvider(ext conf.OAuthProviderConfiguration, scopes string) (OAut
 	}, nil
 }
 
-func (g gitlabProvider) GetOAuthToken(code string) (*oauth2.Token, error) {
+func (g nextcloudProvider) GetOAuthToken(code string) (*oauth2.Token, error) {
 	return g.Exchange(context.Background(), code)
 }
 
-func (g gitlabProvider) GetUserData(ctx context.Context, tok *oauth2.Token) (*UserProvidedData, error) {
-	var u gitlabUser
+func (g nextcloudProvider) GetUserData(ctx context.Context, tok *oauth2.Token) (*UserProvidedData, error) {
+	var u nextcloudUser
 
 	if err := makeRequest(ctx, tok, g.Config, g.Host+"/api/v4/user", &u); err != nil {
 		return nil, err
@@ -74,7 +67,7 @@ func (g gitlabProvider) GetUserData(ctx context.Context, tok *oauth2.Token) (*Us
 
 	data := &UserProvidedData{}
 
-	var emails []*gitlabUserEmail
+	var emails []*nextcloudUserEmail
 	if err := makeRequest(ctx, tok, g.Config, g.Host+"/api/v4/user/emails", &emails); err != nil {
 		return nil, err
 	}
