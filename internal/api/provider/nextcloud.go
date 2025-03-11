@@ -1,33 +1,36 @@
 package provider
 
 import (
+	"bytes"
 	"context"
-	"strconv"
+	"encoding/json"
+	"io"
+	"net/http"
 	"strings"
 
 	"github.com/supabase/auth/internal/conf"
+	"github.com/supabase/auth/internal/utilities"
 	"golang.org/x/oauth2"
 )
 
-// Gitlab
+// Nextcloud
 
 type nextcloudProvider struct {
 	*oauth2.Config
 	Host string
 }
 
-
 type nextcloudUser struct {
-	Email       string `json:"email"`
-	Name        string `json:"name"`
-	AvatarURL   string `json:"avatar_url"`
-	ConfirmedAt string `json:"confirmed_at"`
-	ID          int    `json:"id"`
+	Email            string   `json:"email"`
+	Name             string   `json:"displayname"`
+	AdditionalEmails []string `json:"additional_mail"`
+	ID               string   `json:"id"`
 }
 
-type nextcloudUserEmail struct {
-	ID    int    `json:"id"`
-	Email string `json:"email"`
+type nextcloudUserResponse struct {
+	OCS struct {
+		Data nextcloudUser `json:"data"`
+	} `json:"ocs"`
 }
 
 // NewNextcloudProvider creates a Nextcloud account provider.
@@ -38,14 +41,14 @@ func NewNextcloudProvider(ext conf.OAuthProviderConfiguration, scopes string) (O
 
 	oauthScopes := []string{}
 
-	host := chooseHost(ext.URL, "")
+	host := chooseHost(ext.URL, "") // May be https://cloud.example.org or https://cloud.example.org/index.php
 	return &nextcloudProvider{
 		Config: &oauth2.Config{
 			ClientID:     ext.ClientID[0],
 			ClientSecret: ext.Secret,
 			Endpoint: oauth2.Endpoint{
-				AuthURL:  host + "/oauth/authorize",
-				TokenURL: host + "/oauth/token",
+				AuthURL:  host + "/apps/oauth2/authorize",
+				TokenURL: host + "/apps/oauth2/api/v1/token",
 			},
 			RedirectURL: ext.RedirectURI,
 			Scopes:      oauthScopes,
@@ -59,42 +62,72 @@ func (g nextcloudProvider) GetOAuthToken(code string) (*oauth2.Token, error) {
 }
 
 func (g nextcloudProvider) GetUserData(ctx context.Context, tok *oauth2.Token) (*UserProvidedData, error) {
-	var u nextcloudUser
+	var resp nextcloudUserResponse
 
-	if err := makeRequest(ctx, tok, g.Config, g.Host+"/api/v4/user", &u); err != nil {
+	err := g.makeOCSRequest(ctx, tok, g.Host+"/ocs/v2.php/cloud/user", &resp)
+	if err != nil {
 		return nil, err
 	}
-
+	u := resp.OCS.Data
 	data := &UserProvidedData{}
 
-	var emails []*nextcloudUserEmail
-	if err := makeRequest(ctx, tok, g.Config, g.Host+"/api/v4/user/emails", &emails); err != nil {
-		return nil, err
-	}
-
-	for _, e := range emails {
-		// additional emails from GitLab don't return confirm status
-		if e.Email != "" {
-			data.Emails = append(data.Emails, Email{Email: e.Email, Verified: false, Primary: false})
+	// emails can be confirmed, but we don't have that information
+	for _, e := range u.AdditionalEmails {
+		if e != "" {
+			data.Emails = append(data.Emails, Email{Email: e, Verified: true, Primary: false})
 		}
 	}
 
 	if u.Email != "" {
-		verified := u.ConfirmedAt != ""
-		data.Emails = append(data.Emails, Email{Email: u.Email, Verified: verified, Primary: true})
+		data.Emails = append(data.Emails, Email{Email: u.Email, Verified: true, Primary: true})
 	}
 
 	data.Metadata = &Claims{
 		Issuer:  g.Host,
-		Subject: strconv.Itoa(u.ID),
+		Subject: u.ID,
 		Name:    u.Name,
-		Picture: u.AvatarURL,
 
 		// To be deprecated
-		AvatarURL:  u.AvatarURL,
 		FullName:   u.Name,
-		ProviderId: strconv.Itoa(u.ID),
+		ProviderId: u.ID,
 	}
 
 	return data, nil
+}
+
+// a function to handle the http request with header
+
+func (g nextcloudProvider) makeOCSRequest(ctx context.Context, tok *oauth2.Token, url string, dst interface{}) error {
+
+	// Perform http request, because we neeed to set the Client-Id header
+	req, err := http.NewRequest("GET", g.Host+"/ocs/v2.php/cloud/user", nil)
+
+	if err != nil {
+		return err
+	}
+
+	// set headers
+	req.Header.Set("OCS-APIRequest", "true")
+	req.Header.Set("Authorization", "Bearer "+tok.AccessToken)
+
+	client := &http.Client{Timeout: defaultTimeout}
+	res, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer utilities.SafeClose(res.Body)
+
+	bodyBytes, _ := io.ReadAll(res.Body)
+	res.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+
+	if res.StatusCode < http.StatusOK || res.StatusCode >= http.StatusMultipleChoices {
+		return httpError(res.StatusCode, string(bodyBytes))
+	}
+
+	if err := json.NewDecoder(res.Body).Decode(dst); err != nil {
+		return err
+	}
+
+	return nil
+
 }
