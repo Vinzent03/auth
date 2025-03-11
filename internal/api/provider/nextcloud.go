@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
-	"strings"
 
 	"github.com/supabase/auth/internal/conf"
 	"github.com/supabase/auth/internal/utilities"
