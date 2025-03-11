@@ -26,7 +26,6 @@ func (ts *ExternalTestSuite) TestSignupExternalNextcloud() {
 	ts.Equal(ts.Config.External.Nextcloud.RedirectURI, q.Get("redirect_uri"))
 	ts.Equal(ts.Config.External.Nextcloud.ClientID, []string{q.Get("client_id")})
 	ts.Equal("code", q.Get("response_type"))
-	ts.Equal("read_user", q.Get("scope"))
 
 	claims := ExternalProviderClaims{}
 	p := jwt.NewParser(jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Name}))
@@ -39,10 +38,10 @@ func (ts *ExternalTestSuite) TestSignupExternalNextcloud() {
 	ts.Equal(ts.Config.SiteURL, claims.SiteURL)
 }
 
-func NextcloudTestSignupSetup(ts *ExternalTestSuite, tokenCount *int, userCount *int, code string, user string, emails string) *httptest.Server {
+func NextcloudTestSignupSetup(ts *ExternalTestSuite, tokenCount *int, userCount *int, code string, user string) *httptest.Server {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case "/oauth/token":
+		case "/apps/oauth2/api/v1/token":
 			*tokenCount++
 			ts.Equal(code, r.FormValue("code"))
 			ts.Equal("authorization_code", r.FormValue("grant_type"))
@@ -50,13 +49,10 @@ func NextcloudTestSignupSetup(ts *ExternalTestSuite, tokenCount *int, userCount 
 
 			w.Header().Add("Content-Type", "application/json")
 			fmt.Fprint(w, `{"access_token":"nextcloud_token","expires_in":100000}`)
-		case "/api/v4/user":
+		case "/ocs/v2.php/cloud/user":
 			*userCount++
 			w.Header().Add("Content-Type", "application/json")
 			fmt.Fprint(w, user)
-		case "/api/v4/user/emails":
-			w.Header().Add("Content-Type", "application/json")
-			fmt.Fprint(w, emails)
 		default:
 			w.WriteHeader(500)
 			ts.Fail("unknown nextcloud oauth call %s", r.URL.Path)
@@ -68,19 +64,18 @@ func NextcloudTestSignupSetup(ts *ExternalTestSuite, tokenCount *int, userCount 
 	return server
 }
 
-func (ts *ExternalTestSuite) TestSignupExternalNextcloud_AuthorizationCode() {
-	// additional emails from Nextcloud don't return confirm status
+func (ts *ExternalTestSuite) TestSignupExternalNextcloudAuthorizationCode() {
+	// emails from Nextcloud don't return confirm status
 	ts.Config.Mailer.Autoconfirm = true
 
 	tokenCount, userCount := 0, 0
 	code := "authcode"
-	emails := `[{"id":1,"email":"nextcloud@example.com"}]`
-	server := NextcloudTestSignupSetup(ts, &tokenCount, &userCount, code, nextcloudUser, emails)
+	server := NextcloudTestSignupSetup(ts, &tokenCount, &userCount, code, nextcloudUser)
 	defer server.Close()
 
 	u := performAuthorization(ts, "nextcloud", code, "")
 
-	assertAuthorizationSuccess(ts, u, tokenCount, userCount, "nextcloud@example.com", "Nextcloud Test", "123", "http://example.com/avatar")
+	assertAuthorizationSuccess(ts, u, tokenCount, userCount, "nextcloud@example.com", "Nextcloud Test", "123", "")
 }
 
 func (ts *ExternalTestSuite) TestSignupExternalNextcloudDisableSignupErrorWhenNoUser() {
@@ -88,8 +83,7 @@ func (ts *ExternalTestSuite) TestSignupExternalNextcloudDisableSignupErrorWhenNo
 
 	tokenCount, userCount := 0, 0
 	code := "authcode"
-	emails := `[{"id":1,"email":"nextcloud@example.com"}]`
-	server := NextcloudTestSignupSetup(ts, &tokenCount, &userCount, code, nextcloudUser, emails)
+	server := NextcloudTestSignupSetup(ts, &tokenCount, &userCount, code, nextcloudUser)
 	defer server.Close()
 
 	u := performAuthorization(ts, "nextcloud", code, "")
@@ -102,8 +96,7 @@ func (ts *ExternalTestSuite) TestSignupExternalNextcloudDisableSignupErrorWhenEm
 
 	tokenCount, userCount := 0, 0
 	code := "authcode"
-	emails := `[]`
-	server := NextcloudTestSignupSetup(ts, &tokenCount, &userCount, code, nextcloudUserNoEmail, emails)
+	server := NextcloudTestSignupSetup(ts, &tokenCount, &userCount, code, nextcloudUserNoEmail)
 	defer server.Close()
 
 	u := performAuthorization(ts, "nextcloud", code, "")
@@ -118,8 +111,7 @@ func (ts *ExternalTestSuite) TestSignupExternalNextcloudDisableSignupSuccessWith
 
 	tokenCount, userCount := 0, 0
 	code := "authcode"
-	emails := "[]"
-	server := NextcloudTestSignupSetup(ts, &tokenCount, &userCount, code, nextcloudUser, emails)
+	server := NextcloudTestSignupSetup(ts, &tokenCount, &userCount, code, nextcloudUser)
 	defer server.Close()
 
 	u := performAuthorization(ts, "nextcloud", code, "")
@@ -136,8 +128,7 @@ func (ts *ExternalTestSuite) TestSignupExternalNextcloudDisableSignupSuccessWith
 
 	tokenCount, userCount := 0, 0
 	code := "authcode"
-	emails := `[{"id":1,"email":"secondary@example.com"}]`
-	server := NextcloudTestSignupSetup(ts, &tokenCount, &userCount, code, nextcloudUser, emails)
+	server := NextcloudTestSignupSetup(ts, &tokenCount, &userCount, code, nextcloudUser)
 	defer server.Close()
 
 	u := performAuthorization(ts, "nextcloud", code, "")
@@ -151,8 +142,7 @@ func (ts *ExternalTestSuite) TestInviteTokenExternalNextcloudSuccessWhenMatching
 
 	tokenCount, userCount := 0, 0
 	code := "authcode"
-	emails := "[]"
-	server := NextcloudTestSignupSetup(ts, &tokenCount, &userCount, code, nextcloudUser, emails)
+	server := NextcloudTestSignupSetup(ts, &tokenCount, &userCount, code, nextcloudUser)
 	defer server.Close()
 
 	u := performAuthorization(ts, "nextcloud", code, "invite_token")
@@ -163,8 +153,7 @@ func (ts *ExternalTestSuite) TestInviteTokenExternalNextcloudSuccessWhenMatching
 func (ts *ExternalTestSuite) TestInviteTokenExternalNextcloudErrorWhenNoMatchingToken() {
 	tokenCount, userCount := 0, 0
 	code := "authcode"
-	emails := "[]"
-	server := NextcloudTestSignupSetup(ts, &tokenCount, &userCount, code, nextcloudUser, emails)
+	server := NextcloudTestSignupSetup(ts, &tokenCount, &userCount, code, nextcloudUser)
 	defer server.Close()
 
 	w := performAuthorizationRequest(ts, "nextcloud", "invite_token")
@@ -176,8 +165,7 @@ func (ts *ExternalTestSuite) TestInviteTokenExternalNextcloudErrorWhenWrongToken
 
 	tokenCount, userCount := 0, 0
 	code := "authcode"
-	emails := "[]"
-	server := NextcloudTestSignupSetup(ts, &tokenCount, &userCount, code, nextcloudUser, emails)
+	server := NextcloudTestSignupSetup(ts, &tokenCount, &userCount, code, nextcloudUser)
 	defer server.Close()
 
 	w := performAuthorizationRequest(ts, "nextcloud", "wrong_token")
@@ -189,8 +177,7 @@ func (ts *ExternalTestSuite) TestInviteTokenExternalNextcloudErrorWhenEmailDoesn
 
 	tokenCount, userCount := 0, 0
 	code := "authcode"
-	emails := "[]"
-	server := NextcloudTestSignupSetup(ts, &tokenCount, &userCount, code, nextcloudUserWrongEmail, emails)
+	server := NextcloudTestSignupSetup(ts, &tokenCount, &userCount, code, nextcloudUserWrongEmail)
 	defer server.Close()
 
 	u := performAuthorization(ts, "nextcloud", code, "invite_token")
