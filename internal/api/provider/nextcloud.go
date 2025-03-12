@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 
@@ -34,6 +35,7 @@ type nextcloudUserResponse struct {
 
 // NewNextcloudProvider creates a Nextcloud account provider.
 func NewNextcloudProvider(ext conf.OAuthProviderConfiguration, scopes string) (OAuthProvider, error) {
+	fmt.Println("NewNextcloudProvider", ext)
 	if err := ext.ValidateOAuth(); err != nil {
 		return nil, err
 	}
