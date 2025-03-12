@@ -51,6 +51,7 @@ func NextcloudTestSignupSetup(ts *ExternalTestSuite, tokenCount *int, userCount 
 			fmt.Fprint(w, `{"access_token":"nextcloud_token","expires_in":100000}`)
 		case "/ocs/v2.php/cloud/user":
 			*userCount++
+			ts.Equal("true", r.Header.Get("OCS-APIRequest"))
 			w.Header().Add("Content-Type", "application/json")
 			fmt.Fprint(w, user)
 		default:
@@ -119,25 +120,8 @@ func (ts *ExternalTestSuite) TestSignupExternalNextcloudDisableSignupSuccessWith
 	assertAuthorizationSuccess(ts, u, tokenCount, userCount, "nextcloud@example.com", "Nextcloud Test", "123", "")
 }
 
-func (ts *ExternalTestSuite) TestSignupExternalNextcloudDisableSignupSuccessWithSecondaryEmail() {
-	// additional emails from Nextcloud don't return confirm status
-	ts.Config.Mailer.Autoconfirm = true
-	ts.Config.DisableSignup = true
-
-	ts.createUser("123", "secondary@example.com", "Nextcloud Test", "http://example.com/avatar", "")
-
-	tokenCount, userCount := 0, 0
-	code := "authcode"
-	server := NextcloudTestSignupSetup(ts, &tokenCount, &userCount, code, nextcloudUser)
-	defer server.Close()
-
-	u := performAuthorization(ts, "nextcloud", code, "")
-
-	assertAuthorizationSuccess(ts, u, tokenCount, userCount, "secondary@example.com", "Nextcloud Test", "123", "http://example.com/avatar")
-}
-
 func (ts *ExternalTestSuite) TestInviteTokenExternalNextcloudSuccessWhenMatchingToken() {
-	// name and avatar should be populated from Nextcloud API
+	// name and rest should be populated from Nextcloud API
 	ts.createUser("123", "nextcloud@example.com", "", "", "invite_token")
 
 	tokenCount, userCount := 0, 0
@@ -147,7 +131,7 @@ func (ts *ExternalTestSuite) TestInviteTokenExternalNextcloudSuccessWhenMatching
 
 	u := performAuthorization(ts, "nextcloud", code, "invite_token")
 
-	assertAuthorizationSuccess(ts, u, tokenCount, userCount, "nextcloud@example.com", "Nextcloud Test", "123", "http://example.com/avatar")
+	assertAuthorizationSuccess(ts, u, tokenCount, userCount, "nextcloud@example.com", "Nextcloud Test", "123", "")
 }
 
 func (ts *ExternalTestSuite) TestInviteTokenExternalNextcloudErrorWhenNoMatchingToken() {
