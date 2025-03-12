@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 
@@ -35,7 +34,6 @@ type nextcloudUserResponse struct {
 
 // NewNextcloudProvider creates a Nextcloud account provider.
 func NewNextcloudProvider(ext conf.OAuthProviderConfiguration, scopes string) (OAuthProvider, error) {
-	fmt.Println("NewNextcloudProvider", ext)
 	if err := ext.ValidateOAuth(); err != nil {
 		return nil, err
 	}
@@ -67,10 +65,8 @@ func (g nextcloudProvider) GetUserData(ctx context.Context, tok *oauth2.Token) (
 
 	err := g.makeOCSRequest(ctx, tok, g.Host+"/ocs/v2.php/cloud/user", &resp)
 	if err != nil {
-		fmt.Println("ErrorGettingUserData", err)
 		return nil, err
 	}
-	fmt.Printf("GetUserData %+v\n", resp)
 	u := resp.OCS.Data
 	data := &UserProvidedData{}
 
@@ -98,8 +94,6 @@ func (g nextcloudProvider) GetUserData(ctx context.Context, tok *oauth2.Token) (
 	return data, nil
 }
 
-// a function to handle the http request with header
-
 func (g nextcloudProvider) makeOCSRequest(ctx context.Context, tok *oauth2.Token, url string, dst interface{}) error {
 
 	// Perform http request, because we neeed to set the Client-Id header
@@ -109,7 +103,6 @@ func (g nextcloudProvider) makeOCSRequest(ctx context.Context, tok *oauth2.Token
 		return err
 	}
 
-	// set headers
 	req.Header.Set("OCS-APIRequest", "true")
 	req.Header.Set("Authorization", "Bearer "+tok.AccessToken)
 

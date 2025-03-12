@@ -51,6 +51,8 @@ func NextcloudTestSignupSetup(ts *ExternalTestSuite, tokenCount *int, userCount 
 			fmt.Fprint(w, `{"access_token":"nextcloud_token","expires_in":100000}`)
 		case "/ocs/v2.php/cloud/user":
 			*userCount++
+
+			// OCS-APIRequest header is needed for that endpoint, so we check it here
 			ts.Equal("true", r.Header.Get("OCS-APIRequest"))
 			w.Header().Add("Content-Type", "application/json")
 			fmt.Fprint(w, user)
