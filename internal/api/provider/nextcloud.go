@@ -72,7 +72,6 @@ func (g nextcloudProvider) GetUserData(ctx context.Context, tok *oauth2.Token) (
 	}
 	fmt.Printf("GetUserData %+v\n", resp)
 	u := resp.OCS.Data
-	fmt.Printf("GetUserDataUse: %+v\n", u)
 	data := &UserProvidedData{}
 
 	// emails can be confirmed, but we don't have that information
@@ -104,7 +103,7 @@ func (g nextcloudProvider) GetUserData(ctx context.Context, tok *oauth2.Token) (
 func (g nextcloudProvider) makeOCSRequest(ctx context.Context, tok *oauth2.Token, url string, dst interface{}) error {
 
 	// Perform http request, because we neeed to set the Client-Id header
-	req, err := http.NewRequest("GET", g.Host+"/ocs/v2.php/cloud/user", nil)
+	req, err := http.NewRequest("GET", url, nil)
 
 	if err != nil {
 		return err

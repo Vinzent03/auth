@@ -11,8 +11,8 @@ import (
 
 const (
 	nextcloudUser           string = `{"ocs":{"data":{"additional_mail":["another@example.com"],"additional_mailScope":["v2-private"],"displayname":"Nextcloud Test","displaynameScope":"v2-private","email":"nextcloud@example.com","emailScope":"v2-private","enabled":true,"id":"123"}}}`
-	nextcloudUserWrongEmail string = `{"ocs":{"data":{"additional_mail":["another@example.com"],"additional_mailScope":["v2-private"],"displayname":"Nextcloud Test","displaynameScope":"v2-private","email":"other@example.com","emailScope":"v2-private","enabled":true,"id":"123"}}}`
-	nextcloudUserNoEmail    string = `{"ocs":{"data":{"additional_mail":["another@example.com"],"additional_mailScope":["v2-private"],"displayname":"Nextcloud Test","displaynameScope":"v2-private","emailScope":"v2-private","enabled":true,"id":"123"}}}`
+	nextcloudUserWrongEmail string = `{"ocs":{"data":{"additional_mail":[],"additional_mailScope":["v2-private"],"displayname":"Nextcloud Test","displaynameScope":"v2-private","email":"other@example.com","emailScope":"v2-private","enabled":true,"id":"123"}}}`
+	nextcloudUserNoEmail    string = `{"ocs":{"data":{"additional_mail":[],"additional_mailScope":["v2-private"],"displayname":"Nextcloud Test","displaynameScope":"v2-private","emailScope":"v2-private","enabled":true,"id":"123"}}}`
 )
 
 func (ts *ExternalTestSuite) TestSignupExternalNextcloud() {
@@ -107,7 +107,7 @@ func (ts *ExternalTestSuite) TestSignupExternalNextcloudDisableSignupErrorWhenEm
 func (ts *ExternalTestSuite) TestSignupExternalNextcloudDisableSignupSuccessWithPrimaryEmail() {
 	ts.Config.DisableSignup = true
 
-	ts.createUser("123", "nextcloud@example.com", "Nextcloud Test", "http://example.com/avatar", "")
+	ts.createUser("123", "nextcloud@example.com", "Nextcloud Test", "", "")
 
 	tokenCount, userCount := 0, 0
 	code := "authcode"
@@ -116,7 +116,7 @@ func (ts *ExternalTestSuite) TestSignupExternalNextcloudDisableSignupSuccessWith
 
 	u := performAuthorization(ts, "nextcloud", code, "")
 
-	assertAuthorizationSuccess(ts, u, tokenCount, userCount, "nextcloud@example.com", "Nextcloud Test", "123", "http://example.com/avatar")
+	assertAuthorizationSuccess(ts, u, tokenCount, userCount, "nextcloud@example.com", "Nextcloud Test", "123", "")
 }
 
 func (ts *ExternalTestSuite) TestSignupExternalNextcloudDisableSignupSuccessWithSecondaryEmail() {
