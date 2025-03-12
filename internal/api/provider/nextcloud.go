@@ -67,9 +67,12 @@ func (g nextcloudProvider) GetUserData(ctx context.Context, tok *oauth2.Token) (
 
 	err := g.makeOCSRequest(ctx, tok, g.Host+"/ocs/v2.php/cloud/user", &resp)
 	if err != nil {
+		fmt.Println("ErrorGettingUserData", err)
 		return nil, err
 	}
+	fmt.Printf("GetUserData %+v\n", resp)
 	u := resp.OCS.Data
+	fmt.Printf("GetUserDataUse: %+v\n", u)
 	data := &UserProvidedData{}
 
 	// emails can be confirmed, but we don't have that information

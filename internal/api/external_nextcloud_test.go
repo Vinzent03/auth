@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	nextcloudUser           string = `{"id":123,"email":"nextcloud@example.com","name":"Nextcloud Test","avatar_url":"http://example.com/avatar","confirmed_at":"2012-05-23T09:05:22Z"}`
+	nextcloudUser           string = `{"ocs":{"data":{"additional_mail":["another@example.com"],"additional_mailScope":["v2-private"],"displayname":"Nextcloud Test","displaynameScope":"v2-private","email":"nextcloud@example.com","emailScope":"v2-private","enabled":true,"id":"123"}}}`
 	nextcloudUserWrongEmail string = `{"id":123,"email":"other@example.com","name":"Nextcloud Test","avatar_url":"http://example.com/avatar","confirmed_at":"2012-05-23T09:05:22Z"}`
 	nextcloudUserNoEmail    string = `{"id":123,"name":"Nextcloud Test","avatar_url":"http://example.com/avatar"}`
 )
